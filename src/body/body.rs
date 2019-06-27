@@ -332,6 +332,11 @@ impl Payload for Body {
             _ => FullDataRet(None),
         }
     }
+
+    #[doc(hidden)]
+    fn fn_set_on_upgrade(&mut self) -> Option<for<'a> fn(&'a mut Self, crate::upgrade::OnUpgrade)> {
+        Some(Self::set_on_upgrade)
+    }
 }
 
 impl ::http_body::Body for Body {

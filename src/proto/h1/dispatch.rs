@@ -261,6 +261,14 @@ where
                 return Ok(Async::Ready(()));
             } else if self.body_rx.is_none() && self.conn.can_write_head() && self.dispatch.should_poll() {
                 if let Some((head, mut body)) = try_ready!(self.dispatch.poll_msg().map_err(::Error::new_user_service)) {
+                    if head.headers.contains_key("extract_connection") {
+                        if let Some(set_on_upgrade) = body.fn_set_on_upgrade() {
+                            set_on_upgrade(&mut body, self.conn.on_upgrade());
+                            return Ok(Async::Ready(()));
+                        } else {
+                            return Err(::Error::new_user_no_upgrade());
+                        }
+                    }
                     // Check if the body knows its full data immediately.
                     //
                     // If so, we can skip a bit of bookkeeping that streaming

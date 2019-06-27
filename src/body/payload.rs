@@ -68,6 +68,12 @@ pub trait Payload: Send + 'static {
     fn __hyper_full_data(&mut self, FullDataArg) -> FullDataRet<Self::Data> {
         FullDataRet(None)
     }
+
+    // It is a hack to facilitate extraction of underlying I/O.
+    #[doc(hidden)]
+    fn fn_set_on_upgrade(&mut self) -> Option<for<'a> fn(&'a mut Self, crate::upgrade::OnUpgrade)> {
+        None
+    }
 }
 
 impl<E: Payload> Payload for Box<E> {
