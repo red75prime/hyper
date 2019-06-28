@@ -129,17 +129,23 @@ where I: AsyncRead + AsyncWrite,
         read_buf.len() >= 24 && read_buf[..24] == *H2_PREFACE
     }
 
-    pub fn read_head(&mut self) -> Poll<Option<(MessageHead<T::Incoming>, DecodedLength, bool)>, ::Error> {
+    pub fn read_head(&mut self, should_extract: fn(&crate::proto::RequestLine) -> bool) -> Poll<Option<(MessageHead<T::Incoming>, DecodedLength, bool)>, ::Error> {
         debug_assert!(self.can_read_head());
         trace!("Conn::read_head");
 
-        let msg = match self.io.parse::<T>(ParseContext {
+        let mut msg = match self.io.parse::<T>(ParseContext {
             cached_headers: &mut self.state.cached_headers,
             req_method: &mut self.state.method,
         }) {
             Ok(Async::Ready(msg)) => msg,
             Ok(Async::NotReady) => return Ok(Async::NotReady),
             Err(e) => return self.on_read_head_error(e),
+        };
+
+        if let Some(line) = T::request_line(&msg.head.subject) {
+            if should_extract(line) {
+                msg.wants_upgrade = true;
+            };
         };
 
         // Note: don't deconstruct `msg` into local variables, it appears

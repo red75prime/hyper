@@ -544,6 +544,10 @@ impl Http1Transaction for Server {
     fn update_date() {
         date::update();
     }
+
+    fn request_line(incoming: &Self::Incoming) -> Option<&RequestLine> {
+        Some(incoming)
+    }
 }
 
 impl Server {

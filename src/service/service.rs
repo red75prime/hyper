@@ -37,8 +37,16 @@ pub trait Service {
 
     /// Calls this `Service` with a request, returning a `Future` of the response.
     fn call(&mut self, req: Request<Self::ReqBody>) -> Self::Future;
+
+    #[allow(missing_docs)]
+    fn should_extract_fn() -> fn(&crate::proto::RequestLine) -> bool {
+        always_false
+    }
 }
 
+fn always_false(_: &crate::proto::RequestLine) -> bool {
+    false
+}
 
 /// Create a `Service` from a function.
 ///

@@ -33,6 +33,16 @@ pub(crate) trait Dispatch {
     fn recv_msg(&mut self, msg: ::Result<(Self::RecvItem, Body)>) -> ::Result<()>;
     fn poll_ready(&mut self) -> Poll<(), ()>;
     fn should_poll(&self) -> bool;
+    fn should_extract_fn() -> fn(&crate::proto::RequestLine) -> bool {
+        always_false
+    }
+    fn should_extract_resp(_: Self::PollItem) -> bool {
+        false
+    }
+}
+
+fn always_false(_: &crate::proto::RequestLine) -> bool {
+    false
 }
 
 pub struct Server<S: Service> {
@@ -223,7 +233,7 @@ where
             }
         }
         // dispatch is ready for a message, try to read one
-        match self.conn.read_head() {
+        match self.conn.read_head(D::should_extract_fn()) {
             Ok(Async::Ready(Some((head, body_len, wants_upgrade)))) => {
                 let mut body = match body_len {
                     DecodedLength::ZERO => Body::empty(),
@@ -261,14 +271,6 @@ where
                 return Ok(Async::Ready(()));
             } else if self.body_rx.is_none() && self.conn.can_write_head() && self.dispatch.should_poll() {
                 if let Some((head, mut body)) = try_ready!(self.dispatch.poll_msg().map_err(::Error::new_user_service)) {
-                    if head.headers.contains_key("extract_connection") {
-                        if let Some(set_on_upgrade) = body.fn_set_on_upgrade() {
-                            set_on_upgrade(&mut body, self.conn.on_upgrade());
-                            return Ok(Async::Ready(()));
-                        } else {
-                            return Err(::Error::new_user_no_upgrade());
-                        }
-                    }
                     // Check if the body knows its full data immediately.
                     //
                     // If so, we can skip a bit of bookkeeping that streaming
@@ -454,6 +456,14 @@ where
 
     fn should_poll(&self) -> bool {
         self.in_flight.is_some()
+    }
+
+    fn should_extract_fn() -> fn(&crate::proto::RequestLine) -> bool {
+        S::should_extract_fn()
+    }
+
+    fn should_extract_resp(item: Self::PollItem) -> bool {
+        item.subject == StatusCode::IM_A_TEAPOT
     }
 }
 

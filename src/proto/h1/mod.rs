@@ -48,6 +48,10 @@ pub(crate) trait Http1Transaction {
     }
 
     fn update_date() {}
+
+    fn request_line(_incoming: &Self::Incoming) -> Option<&crate::proto::RequestLine> {
+        None
+    }
 }
 
 /// Result newtype for Http1Transaction::parse.
