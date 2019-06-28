@@ -39,7 +39,7 @@ pub trait Service {
     fn call(&mut self, req: Request<Self::ReqBody>) -> Self::Future;
 
     #[allow(missing_docs)]
-    fn should_extract_fn() -> fn(&crate::proto::RequestLine) -> bool {
+    fn should_extract_fn(&self) -> fn(&crate::proto::RequestLine) -> bool {
         always_false
     }
 }
@@ -73,6 +73,21 @@ where
 {
     ServiceFn {
         f,
+        should_extract: always_false,
+        _req: PhantomData,
+    }
+}
+
+/// Create a `Service` from a function.
+///
+pub fn service_extract_fn<F, R, S>(f: F, should_extract: fn(&crate::proto::RequestLine) -> bool) -> ServiceFn<F, R>
+where
+    F: FnMut(Request<R>) -> S,
+    S: IntoFuture,
+{
+    ServiceFn {
+        f,
+        should_extract,
         _req: PhantomData,
     }
 }
@@ -104,6 +119,7 @@ where
 // Not exported from crate as this will likely be replaced with `impl Service`.
 pub struct ServiceFn<F, R> {
     f: F,
+    should_extract: fn(&crate::proto::RequestLine) -> bool,
     _req: PhantomData<fn(R)>,
 }
 
@@ -122,6 +138,10 @@ where
 
     fn call(&mut self, req: Request<Self::ReqBody>) -> Self::Future {
         (self.f)(req).into_future()
+    }
+
+    fn should_extract_fn(&self) -> fn(&crate::proto::RequestLine) -> bool {
+        self.should_extract
     }
 }
 

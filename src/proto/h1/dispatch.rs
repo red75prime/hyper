@@ -33,7 +33,7 @@ pub(crate) trait Dispatch {
     fn recv_msg(&mut self, msg: ::Result<(Self::RecvItem, Body)>) -> ::Result<()>;
     fn poll_ready(&mut self) -> Poll<(), ()>;
     fn should_poll(&self) -> bool;
-    fn should_extract_fn() -> fn(&crate::proto::RequestLine) -> bool {
+    fn should_extract_fn(&self) -> fn(&crate::proto::RequestLine) -> bool {
         always_false
     }
     fn should_extract_resp(_: Self::PollItem) -> bool {
@@ -233,7 +233,7 @@ where
             }
         }
         // dispatch is ready for a message, try to read one
-        match self.conn.read_head(D::should_extract_fn()) {
+        match self.conn.read_head(self.dispatch.should_extract_fn()) {
             Ok(Async::Ready(Some((head, body_len, wants_upgrade)))) => {
                 let mut body = match body_len {
                     DecodedLength::ZERO => Body::empty(),
@@ -458,8 +458,8 @@ where
         self.in_flight.is_some()
     }
 
-    fn should_extract_fn() -> fn(&crate::proto::RequestLine) -> bool {
-        S::should_extract_fn()
+    fn should_extract_fn(&self) -> fn(&crate::proto::RequestLine) -> bool {
+        self.service.should_extract_fn()
     }
 
     fn should_extract_resp(item: Self::PollItem) -> bool {
