@@ -57,6 +57,7 @@ pub use client::Client;
 pub use error::{Result, Error};
 pub use body::{Body, Chunk};
 pub use server::Server;
+pub use proto::RequestLine;
 
 #[macro_use]
 mod common;

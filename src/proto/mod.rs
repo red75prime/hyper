@@ -21,6 +21,7 @@ pub struct MessageHead<S> {
 /// An incoming request message.
 pub type RequestHead = MessageHead<RequestLine>;
 
+#[allow(missing_docs)]
 #[derive(Debug, Default, PartialEq)]
 pub struct RequestLine(pub Method, pub Uri);
 
