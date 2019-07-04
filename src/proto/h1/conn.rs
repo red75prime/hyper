@@ -142,11 +142,14 @@ where I: AsyncRead + AsyncWrite,
             Err(e) => return self.on_read_head_error(e),
         };
 
+        let mut block_100_continue = false;
         if let Some(line) = T::request_line(&msg.head.subject) {
             if should_extract(line) {
                 msg.wants_upgrade = true;
+                block_100_continue = true;
             };
         };
+        let block_100_continue = block_100_continue;
 
         // Note: don't deconstruct `msg` into local variables, it appears
         // the optimizer doesn't remove the extra copies.
@@ -164,7 +167,7 @@ where I: AsyncRead + AsyncWrite,
                 self.try_keep_alive();
             }
         } else {
-            if msg.expect_continue {
+            if msg.expect_continue && !block_100_continue {
                 let cont = b"HTTP/1.1 100 Continue\r\n\r\n";
                 self.io.headers_buf().extend_from_slice(cont);
             }
