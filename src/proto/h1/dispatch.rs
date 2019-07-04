@@ -36,7 +36,7 @@ pub(crate) trait Dispatch {
     fn should_extract_fn(&self) -> fn(&crate::proto::RequestLine) -> bool {
         always_false
     }
-    fn should_extract_resp(_: Self::PollItem) -> bool {
+    fn should_extract_resp(_: &Self::PollItem) -> bool {
         false
     }
 }
@@ -271,6 +271,10 @@ where
                 return Ok(Async::Ready(()));
             } else if self.body_rx.is_none() && self.conn.can_write_head() && self.dispatch.should_poll() {
                 if let Some((head, mut body)) = try_ready!(self.dispatch.poll_msg().map_err(::Error::new_user_service)) {
+                    if D::should_extract_resp(&head) {
+                        // don't write anything
+                        return Ok(Async::Ready(()));
+                    }
                     // Check if the body knows its full data immediately.
                     //
                     // If so, we can skip a bit of bookkeeping that streaming
@@ -462,7 +466,7 @@ where
         self.service.should_extract_fn()
     }
 
-    fn should_extract_resp(item: Self::PollItem) -> bool {
+    fn should_extract_resp(item: &Self::PollItem) -> bool {
         item.subject == StatusCode::IM_A_TEAPOT
     }
 }
