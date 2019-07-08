@@ -197,6 +197,7 @@ where I: AsyncRead + AsyncWrite,
     }
 
     pub fn read_body(&mut self) -> Poll<Option<Chunk>, io::Error> {
+        trace!("Conn::read_body");
         debug_assert!(self.can_read_body());
 
         let (reading, ret) = match self.state.reading {
