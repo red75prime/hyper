@@ -273,6 +273,7 @@ where
                 if let Some((head, mut body)) = try_ready!(self.dispatch.poll_msg().map_err(::Error::new_user_service)) {
                     if D::should_extract_resp(&head) {
                         // don't write anything
+                        self.close();
                         return Ok(Async::Ready(()));
                     }
                     // Check if the body knows its full data immediately.

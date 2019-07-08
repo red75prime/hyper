@@ -147,8 +147,6 @@ where I: AsyncRead + AsyncWrite,
             if should_extract(line) {
                 msg.wants_upgrade = true;
                 block_100_continue = true;
-                // prevent reading body
-                msg.decode = DecodedLength::ZERO;
             };
         };
         let block_100_continue = block_100_continue;
@@ -163,7 +161,7 @@ where I: AsyncRead + AsyncWrite,
         self.state.version = msg.head.version;
 
         if msg.decode == DecodedLength::ZERO {
-            debug_assert!(!msg.expect_continue || block_100_continue, "expect-continue needs a body");
+            debug_assert!(!msg.expect_continue, "expect-continue needs a body");
             self.state.reading = Reading::KeepAlive;
             if !T::should_read_first() {
                 self.try_keep_alive();
