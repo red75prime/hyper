@@ -26,6 +26,7 @@ const H2_PREFACE: &'static [u8] = b"PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
 pub(crate) struct Conn<I, B, T> {
     io: Buffered<I, EncodedBuf<B>>,
     state: State,
+    is_extracting: bool,
     _marker: PhantomData<T>
 }
 
@@ -52,6 +53,7 @@ where I: AsyncRead + AsyncWrite,
                 // If they tell us otherwise, we'll downgrade in `read_head`.
                 version: Version::HTTP_11,
             },
+            is_extracting: false,
             _marker: PhantomData,
         }
     }
@@ -147,6 +149,9 @@ where I: AsyncRead + AsyncWrite,
             if should_extract(line) {
                 msg.wants_upgrade = true;
                 block_100_continue = true;
+                // read_body will return NotReady if is_extracting is true
+                // to prevent parsing data in buffer
+                self.is_extracting = true;
             };
         };
         let block_100_continue = block_100_continue;
@@ -198,6 +203,12 @@ where I: AsyncRead + AsyncWrite,
 
     pub fn read_body(&mut self) -> Poll<Option<Chunk>, io::Error> {
         trace!("Conn::read_body");
+        if self.is_extracting {
+            trace!("Conn::read_body socket extraction");
+            self.is_extracting = false;
+            // Is task notification required?
+            return Ok(Async::NotReady);
+        }
         debug_assert!(self.can_read_body());
 
         let (reading, ret) = match self.state.reading {
