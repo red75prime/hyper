@@ -147,6 +147,8 @@ where I: AsyncRead + AsyncWrite,
             if should_extract(line) {
                 msg.wants_upgrade = true;
                 block_100_continue = true;
+                // prevent reading body
+                self.state.reading = Reading::Closed;
             };
         };
         let block_100_continue = block_100_continue;
