@@ -267,8 +267,8 @@ impl Body {
                 recv: ref mut h2, ..
             } => h2
                 .poll()
-                .map(|async| {
-                    async.map(|opt| {
+                .map(|r#async| {
+                    r#async.map(|opt| {
                         opt.map(|bytes| {
                             let _ = h2.release_capacity().release_capacity(bytes.len());
                             Chunk::from(bytes)
