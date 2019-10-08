@@ -220,6 +220,12 @@ mod addr_stream {
             self.remote_addr
         }
 
+        /// Returns the local address of this connection.
+        #[inline]
+        pub fn local_addr(&self) -> Result<SocketAddr, io::Error> {
+            self.inner.local_addr()
+        }
+
         /// Consumes the AddrStream and returns the underlying IO object
         #[inline]
         pub fn into_inner(self) -> TcpStream {
