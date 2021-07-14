@@ -1176,13 +1176,12 @@ pub(crate) mod spawn_all {
     }
 }
 
-mod upgrades {
+pub mod upgrades {
+    //! Upgradable connection
+
     use super::*;
 
-    // A future binding a connection with a Service with Upgrade support.
-    //
-    // This type is unnameable outside the crate, and so basically just an
-    // `impl Future`, without requiring Rust 1.26.
+    /// A future binding a connection with a Service with Upgrade support.
     #[must_use = "futures do nothing unless polled"]
     #[allow(missing_debug_implementations)]
     pub struct UpgradeableConnection<T, S, E>
@@ -1207,6 +1206,82 @@ mod upgrades {
         /// can finish.
         pub fn graceful_shutdown(mut self: Pin<&mut Self>) {
             Pin::new(&mut self.inner).graceful_shutdown()
+        }
+
+        // /// Poll the connection for completion, but without calling `shutdown`
+        // /// on the underlying IO.
+        // ///
+        // /// This is useful to allow running a connection while doing an HTTP
+        // /// upgrade. Once the upgrade is completed, the connection would be "done",
+        // /// but it is not desired to actually shutdown the IO object. Instead you
+        // /// would take it back using `into_parts`.
+        // ///
+        // /// Use [`poll_fn`](https://docs.rs/futures/0.1.25/futures/future/fn.poll_fn.html)
+        // /// and [`try_ready!`](https://docs.rs/futures/0.1.25/futures/macro.try_ready.html)
+        // pub fn poll_without_shutdown(
+        //     &mut self,
+        //     cx: &mut task::Context<'_>,
+        // ) -> Poll<crate::Result<()>>
+        // where
+        //     I: 'static + Send,
+        // {
+        //     loop {
+        //         match ready!(Pin::new(self.inner.conn.as_mut().unwrap()).poll(cx)) {
+        //             Ok(proto::Dispatched::Shutdown) => return Poll::Ready(Ok(())),
+        //             #[cfg(feature = "http1")]
+        //             Ok(proto::Dispatched::Upgrade(pending)) => {
+        //                 match self.inner.conn.take() {
+        //                     Some(ProtoServer::H1 { h1, .. }) => {
+        //                         let (io, buf, _) = h1.into_inner();
+        //                         pending.fulfill(Upgraded::new(io, buf));
+        //                         return Poll::Ready(Ok(()));
+        //                     }
+        //                     _ => {
+        //                         drop(pending);
+        //                         unreachable!("Upgrade expects h1")
+        //                     }
+        //                 };
+        //             }
+        //             Err(e) => {
+        //                 #[cfg(feature = "http1")]
+        //                 #[cfg(feature = "http2")]
+        //                 match *e.kind() {
+        //                     Kind::Parse(Parse::VersionH2) if self.inner.fallback.to_h2() => {
+        //                         self.inner.upgrade_h2();
+        //                         continue;
+        //                     }
+        //                     _ => (),
+        //                 }
+
+        //                 return Poll::Ready(Err(e));
+        //             }
+        //         }
+        //     }
+        // }
+
+        /// Return the inner IO object, and additional information, if available.
+        ///
+        /// This method will return a `None` if this connection is using an h2 protocol
+        /// or if this connection was upgraded
+        pub fn try_into_parts(self) -> Option<Parts<I, S>> {
+            match self.inner.conn {
+                #[cfg(feature = "http1")]
+                Some(ProtoServer::H1 { h1, .. }) => {
+                    let (io, read_buf, dispatch) = h1.into_inner();
+                    Some(Parts {
+                        io,
+                        read_buf,
+                        service: dispatch.into_service(),
+                        _inner: (),
+                    })
+                }
+                Some(ProtoServer::H2 { .. }) => None,
+
+                #[cfg(not(feature = "http1"))]
+                Some(ProtoServer::H1 { h1, .. }) => match h1.0 {},
+
+                None => None,
+            }
         }
     }
 
