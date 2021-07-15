@@ -60,9 +60,20 @@ where
                 // We assume a modern world where the remote speaks HTTP/1.1.
                 // If they tell us otherwise, we'll downgrade in `read_head`.
                 version: Version::HTTP_11,
+                wait_body_poll: false,
             },
             _marker: PhantomData,
         }
+    }
+
+    #[cfg(feature = "server")]
+    pub(crate) fn set_wait_body_poll(&mut self) {
+        self.state.wait_body_poll = true;
+    }
+
+    #[cfg(feature = "server")]
+    pub(crate) fn wait_body_poll(&self) -> bool {
+        self.state.wait_body_poll
     }
 
     #[cfg(feature = "server")]
@@ -811,6 +822,9 @@ struct State {
     upgrade: Option<crate::upgrade::Pending>,
     /// Either HTTP/1.0 or 1.1 connection
     version: Version,
+    /// If set, unconditionally wait for Body polls before reading 
+    /// incoming stream (as with Expect header)
+    wait_body_poll: bool,
 }
 
 #[derive(Debug)]

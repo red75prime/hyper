@@ -97,6 +97,8 @@ pub struct Http<E = Exec> {
     mode: ConnectionMode,
     max_buf_size: Option<usize>,
     pipeline_flush: bool,
+    #[cfg(feature = "http1")]
+    h1_wait_body_poll: bool,
 }
 
 /// The internal mode of HTTP protocol which indicates the behavior when a parse error occurs.
@@ -264,6 +266,8 @@ impl Http {
             mode: ConnectionMode::default(),
             max_buf_size: None,
             pipeline_flush: false,
+            #[cfg(feature = "http1")]
+            h1_wait_body_poll: false,
         }
     }
 }
@@ -336,6 +340,18 @@ impl<E> Http<E> {
         self.h1_preserve_header_case = enabled;
         self
     }
+
+    /// If it is enabled, it instructs the engine to wait for first Body::poll()
+    /// before reading request body data from IO object.
+    ///
+    /// Default is false.
+    #[cfg(feature = "http1")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "http1")))]
+    pub fn http1_wait_body_poll(&mut self, enabled: bool) -> &mut Self {
+        self.h1_wait_body_poll = enabled;
+        self
+    }
+
 
     /// Sets whether HTTP2 is required.
     ///
@@ -517,6 +533,8 @@ impl<E> Http<E> {
             mode: self.mode,
             max_buf_size: self.max_buf_size,
             pipeline_flush: self.pipeline_flush,
+            #[cfg(feature = "http1")]
+            h1_wait_body_poll: self.h1_wait_body_poll,
         }
     }
 
@@ -572,6 +590,9 @@ impl<E> Http<E> {
                 }
                 if self.h1_preserve_header_case {
                     conn.set_preserve_header_case();
+                }
+                if self.h1_wait_body_poll {
+                    conn.set_wait_body_poll();
                 }
                 conn.set_flush_pipeline(self.pipeline_flush);
                 if let Some(max) = self.max_buf_size {

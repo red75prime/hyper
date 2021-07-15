@@ -249,7 +249,8 @@ where
                 let body = match body_len {
                     DecodedLength::ZERO => Body::empty(),
                     other => {
-                        let (tx, rx) = Body::new_channel(other, wants.contains(Wants::EXPECT));
+                        let wanter = wants.contains(Wants::EXPECT) || self.conn.wait_body_poll();
+                        let (tx, rx) = Body::new_channel(other, wanter);
                         self.body_tx = Some(tx);
                         rx
                     }
