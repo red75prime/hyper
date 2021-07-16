@@ -907,6 +907,56 @@ async fn expect_continue_waits_for_body_poll() {
     child.join().expect("client thread");
 }
 
+#[tokio::test]
+async fn wait_for_body_poll_waits_for_body_poll() {
+    let _ = pretty_env_logger::try_init();
+    let listener = tcp_bind(&"127.0.0.1:0".parse().unwrap()).unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    let child = thread::spawn(move || {
+        let mut tcp = connect(&addr);
+
+        tcp.write_all(
+            b"\
+            POST /foo HTTP/1.1\r\n\
+            Host: example.domain\r\n\
+            Content-Length: 100\r\n\
+            Connection: Close\r\n\
+            \r\n\
+        ",
+        )
+        .expect("write");
+
+        let expected = "HTTP/1.1 400 Bad Request\r\n";
+        let mut resp = String::new();
+        tcp.read_to_string(&mut resp).expect("read");
+
+        assert_eq!(&resp[..expected.len()], expected);
+    });
+
+    let (socket, _) = listener.accept().await.expect("accept");
+
+    Http::new()
+        .http1_wait_body_poll(true)
+        .serve_connection(
+            socket,
+            service_fn(|req| {
+                // But! We're never going to poll the body!
+                tokio::time::sleep(Duration::from_millis(50)).map(move |_| {
+                    // Move and drop the req, so we don't auto-close
+                    drop(req);
+                    Response::builder()
+                        .status(StatusCode::BAD_REQUEST)
+                        .body(hyper::Body::empty())
+                })
+            }),
+        )
+        .await
+        .expect("serve_connection");
+
+    child.join().expect("client thread");
+}
+
 #[test]
 fn pipeline_disabled() {
     let server = serve();
